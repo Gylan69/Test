@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Focus Timer"
+description = "A responsive timer app for countdowns, stopwatch sessions, and Pomodoro focus cycles, with local persistence, synthesized audio alerts, and browser notifications."
+version = "1.0.0"
+id = "artifacts/focus-timer"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24703
+
+[services.development]
+run = "pnpm --filter @workspace/focus-timer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/focus-timer", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/focus-timer/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24703"
+BASE_PATH = "/"
