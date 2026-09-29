@@ -323,6 +323,16 @@ function AppHome() {
           const finishedPhase = state.pomodoroPhase;
           playCompletionChime(state.volume, state.muted);
           sendCompletionNotification(phaseLabel(finishedPhase));
+          if (!state.autoTransition) {
+            updateState({
+              pomodoroRemainingMs: 0,
+              pomodoroRunning: false,
+              pomodoroDeadline: null,
+              cycleCount: state.cycleCount + (finishedPhase === 'work' ? 1 : 0),
+            });
+            frame = window.requestAnimationFrame(tick);
+            return;
+          }
           let phase = finishedPhase;
           let cycles = state.cycleCount;
           let deadline = state.pomodoroDeadline;
@@ -334,12 +344,12 @@ function AppHome() {
               ? (cycles % 4 === 0 ? 'longBreak' : 'shortBreak')
               : 'work';
             deadline += phaseDuration(phase);
-          } while (state.autoTransition && deadline <= current);
+          } while (deadline <= current);
           updateState({
             pomodoroPhase: phase,
-            pomodoroRemainingMs: state.autoTransition ? Math.max(0, deadline - current) : phaseDuration(phase),
-            pomodoroRunning: state.autoTransition,
-            pomodoroDeadline: state.autoTransition ? deadline : null,
+            pomodoroRemainingMs: Math.max(0, deadline - current),
+            pomodoroRunning: true,
+            pomodoroDeadline: deadline,
             cycleCount: cycles,
           });
         }
@@ -475,8 +485,10 @@ function AppHome() {
   };
 
   const skipPomodoro = () => {
+    // A finished, paused work phase has already been counted by the deadline handler.
+    const nextWorkCount = state.cycleCount + (state.pomodoroRemainingMs === 0 && !state.pomodoroRunning ? 0 : 1);
     const nextPhase: PomodoroPhase = state.pomodoroPhase === 'work'
-      ? ((state.cycleCount + 1) % 4 === 0 ? 'longBreak' : 'shortBreak')
+      ? (nextWorkCount % 4 === 0 ? 'longBreak' : 'shortBreak')
       : 'work';
     updateState({
       pomodoroPhase: nextPhase,

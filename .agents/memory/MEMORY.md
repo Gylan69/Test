@@ -1,0 +1,1 @@
+- [Workspace package installs](workspace-package-installs.md) — generic package installer cannot target a pnpm workspace leaf; use a filtered pnpm add for leaf-only dependencies.
