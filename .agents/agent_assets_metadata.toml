@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "6BLZawlq4s3pOeG_jAwJy"
+uri = "file://exports/stillpoint-timer.zip"
+type = "unspecified"
+title = "Stillpoint WordPress plugin"
+description = "Upload this ZIP in WordPress, activate it, and add [stillpoint_timer] to a page."
+logical_id = "6334cd71-99d4-4536-a229-7709090fe46b"
+content_hash = "sha256:6ca4dbab30ea06b5e4a7de8c30b98087abc8352681cd8a60e8215f6bc147c071"
+size = 132207
+mtime_ms = 1790705903300
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:c722b83a-75a1-4a94-99ae-4e83cc2eaa4c/6334cd71-99d4-4536-a229-7709090fe46b/57d1317b-dd8f-4886-8be7-7f958628127a"
+storage_version_token = "1790705949321281"
+content_type = "application/octet-stream"
