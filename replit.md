@@ -1,44 +1,40 @@
-# [Project name]
+# Stillpoint
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A responsive single-page app for countdowns, stopwatch laps, and Pomodoro focus sessions.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/focus-timer run typecheck` — check the timer app
+- Start or restart its existing `artifacts/focus-timer: web` workflow for the preview.
+- No database, API, or secrets are required for the timer app.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- React, TypeScript, Vite, Tailwind CSS in a pnpm workspace
+- Browser Web Audio API and Notification API; localStorage for persistence
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/focus-timer/src/App.tsx` — timer state, interaction logic, and UI
+- `artifacts/focus-timer/src/index.css` — theme and responsive styling
+- `artifacts/focus-timer/index.html` — page metadata
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Timing is derived from wall-clock timestamps, not interval tick counts. This keeps running timers accurate after background throttling and refresh.
+- Timer state stays local to this browser; it is not synced across devices.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Countdown with quick-add and progress ring; hundredths stopwatch with laps; Pomodoro presets, automatic transitions and completed-session count. Includes chime volume/mute, optional desktop notifications, theme persistence, keyboard shortcuts and live tab title.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep this a modern, responsive single-page timer. Preserve all three modes and local persistence.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Browser notifications need permission and a secure context. Sound may require a user interaction before browsers allow playback.
 
 ## Pointers
 

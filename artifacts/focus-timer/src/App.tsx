@@ -177,7 +177,6 @@ function sendCompletionNotification(label: string) {
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     new Notification(`${label} complete`, {
       body: label === 'Deep work' ? 'A small pause is waiting for you.' : 'Ready when you are.',
-      icon: '/favicon.ico',
     });
   }
 }
@@ -294,6 +293,8 @@ function AppHome() {
     : state.pomodoroRemainingMs;
 
   useEffect(() => {
+    // Persist timestamps rather than tick counts: a refresh or backgrounded tab
+    // can always reconstruct the true elapsed or remaining time.
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
@@ -303,6 +304,8 @@ function AppHome() {
   }, [theme]);
 
   useEffect(() => {
+    // Animation frames make the display smooth; Date.now() is the source of
+    // truth, so throttled frames never introduce timer drift.
     const tick = () => {
       const current = Date.now();
       setNow(current);
@@ -318,30 +321,27 @@ function AppHome() {
         if (completedDeadline.current !== state.pomodoroDeadline) {
           completedDeadline.current = state.pomodoroDeadline;
           const finishedPhase = state.pomodoroPhase;
-          const nextPhase: PomodoroPhase = finishedPhase === 'work'
-            ? (state.cycleCount + 1 >= 4 ? 'longBreak' : 'shortBreak')
-            : 'work';
-          const nextRemaining = phaseDuration(nextPhase);
           playCompletionChime(state.volume, state.muted);
           sendCompletionNotification(phaseLabel(finishedPhase));
-          if (state.autoTransition) {
-            updateState((previous) => ({
-              ...previous,
-              pomodoroPhase: nextPhase,
-              pomodoroRemainingMs: nextRemaining,
-              pomodoroRunning: true,
-              pomodoroDeadline: current + nextRemaining,
-              cycleCount: finishedPhase === 'work' ? previous.cycleCount + 1 : previous.cycleCount,
-            }));
-          } else {
-            updateState((previous) => ({
-              ...previous,
-              pomodoroRemainingMs: 0,
-              pomodoroRunning: false,
-              pomodoroDeadline: null,
-              cycleCount: finishedPhase === 'work' ? previous.cycleCount + 1 : previous.cycleCount,
-            }));
-          }
+          let phase = finishedPhase;
+          let cycles = state.cycleCount;
+          let deadline = state.pomodoroDeadline;
+          // Catch up from the original deadline, not from the next animation
+          // frame. This also handles multiple phases missed while away.
+          do {
+            if (phase === 'work') cycles += 1;
+            phase = phase === 'work'
+              ? (cycles % 4 === 0 ? 'longBreak' : 'shortBreak')
+              : 'work';
+            deadline += phaseDuration(phase);
+          } while (state.autoTransition && deadline <= current);
+          updateState({
+            pomodoroPhase: phase,
+            pomodoroRemainingMs: state.autoTransition ? Math.max(0, deadline - current) : phaseDuration(phase),
+            pomodoroRunning: state.autoTransition,
+            pomodoroDeadline: state.autoTransition ? deadline : null,
+            cycleCount: cycles,
+          });
         }
       }
       frame = window.requestAnimationFrame(tick);
@@ -464,16 +464,25 @@ function AppHome() {
     cycleCount: 0,
   });
 
+  const selectPomodoroPhase = (phase: PomodoroPhase) => {
+    completedDeadline.current = null;
+    updateState({
+      pomodoroPhase: phase,
+      pomodoroRemainingMs: phaseDuration(phase),
+      pomodoroRunning: false,
+      pomodoroDeadline: null,
+    });
+  };
+
   const skipPomodoro = () => {
     const nextPhase: PomodoroPhase = state.pomodoroPhase === 'work'
-      ? (state.cycleCount + 1 >= 4 ? 'longBreak' : 'shortBreak')
+      ? ((state.cycleCount + 1) % 4 === 0 ? 'longBreak' : 'shortBreak')
       : 'work';
     updateState({
       pomodoroPhase: nextPhase,
       pomodoroRemainingMs: phaseDuration(nextPhase),
       pomodoroRunning: false,
       pomodoroDeadline: null,
-      cycleCount: state.pomodoroPhase === 'work' ? state.cycleCount + 1 : state.cycleCount,
     });
   };
 
@@ -495,6 +504,7 @@ function AppHome() {
 
   const activeRunning = state.mode === 'countdown' ? state.countdownRunning : state.mode === 'stopwatch' ? state.stopwatchRunning : state.pomodoroRunning;
   const activeDisplay = state.mode === 'countdown' ? formatCountdown(countdownMs) : state.mode === 'stopwatch' ? formatStopwatch(stopwatchMs) : formatPomodoro(pomodoroMs);
+  const activeComplete = state.mode === 'countdown' ? countdownMs === 0 : state.mode === 'pomodoro' ? pomodoroMs === 0 : false;
   const progress = state.mode === 'countdown'
     ? (state.countdownDurationMs > 0 ? countdownMs / state.countdownDurationMs : 0)
     : state.mode === 'pomodoro'
@@ -569,7 +579,7 @@ function AppHome() {
               </div>
             )}
             <div
-              className="relative mt-2 flex aspect-square w-[min(77vw,25rem)] items-center justify-center sm:w-[27rem]"
+              className="relative mt-2 flex aspect-square w-[min(77vw,25rem)] items-center justify-center sm:w-[22rem]"
               aria-label={`${activeDisplay} remaining`}
               data-testid="display-timer"
             >
@@ -588,11 +598,11 @@ function AppHome() {
                 />
               </svg>
               <div className="relative flex flex-col items-center">
-                <span className="font-timer text-[clamp(2.5rem,11vw,5.55rem)] font-medium leading-none tracking-[-.075em] text-foreground" data-testid="text-timer-value">
+                <span className="font-timer text-[clamp(2.5rem,10vw,4.5rem)] font-medium leading-none tracking-[-.075em] text-foreground" data-testid="text-timer-value">
                   {activeDisplay}
                 </span>
                 <span className="mt-4 text-xs font-bold uppercase tracking-[.2em] text-muted-foreground" data-testid="status-timer">
-                  {activeRunning ? 'Running' : countdownMs === 0 || pomodoroMs === 0 ? 'Complete' : 'Paused'}
+                  {activeRunning ? 'Running' : activeComplete ? 'Complete' : 'Paused'}
                 </span>
               </div>
             </div>
@@ -602,17 +612,37 @@ function AppHome() {
             )}
 
             {state.mode === 'pomodoro' && (
-              <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="font-semibold">Cycle {Math.min(state.cycleCount + 1, 4)} of 4</span>
-                <span className="h-1 w-1 rounded-full bg-border" />
-                <button
-                  type="button"
-                  data-testid="button-skip-phase"
-                  onClick={skipPomodoro}
-                  className="flex items-center gap-1 font-bold text-primary transition-colors hover:text-accent"
-                >
-                  Skip phase <ChevronRight size={14} />
-                </button>
+              <div className="mt-5 flex flex-col items-center gap-4">
+                <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Pomodoro presets">
+                  {([
+                    ['work', 'Work · 25m'],
+                    ['shortBreak', 'Short break · 5m'],
+                    ['longBreak', 'Long break · 15m'],
+                  ] as const).map(([phase, label]) => (
+                    <button
+                      key={phase}
+                      type="button"
+                      aria-pressed={state.pomodoroPhase === phase}
+                      data-testid={`button-preset-${phase}`}
+                      onClick={() => selectPomodoroPhase(phase)}
+                      className={`rounded-full border px-3 py-2 text-xs font-bold transition-colors ${state.pomodoroPhase === phase ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="font-semibold">Cycle {(state.cycleCount % 4) + 1} of 4</span>
+                  <span className="h-1 w-1 rounded-full bg-border" />
+                  <button
+                    type="button"
+                    data-testid="button-skip-phase"
+                    onClick={skipPomodoro}
+                    className="flex items-center gap-1 font-bold text-primary transition-colors hover:text-accent"
+                  >
+                    Skip phase <ChevronRight size={14} />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -665,6 +695,7 @@ function AppHome() {
                   type="button"
                   role="switch"
                   aria-checked={state.autoTransition}
+                   aria-label="Automatically start the next Pomodoro phase"
                   data-testid="switch-auto-transition"
                   onClick={() => updateState({ autoTransition: !state.autoTransition })}
                   className={`relative h-6 w-11 rounded-full transition-colors ${state.autoTransition ? 'bg-primary' : 'bg-muted-foreground/35'}`}
@@ -716,7 +747,7 @@ function AppHome() {
                 <div>
                   <p className="text-xs font-bold">Desktop notifications</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {notificationPermission === 'granted' ? 'You’ll hear when a phase ends.' : notificationPermission === 'denied' ? 'Blocked by your browser.' : 'Optional, for background focus.'}
+                     {notificationPermission === 'granted' ? 'You’ll be notified when a phase ends.' : notificationPermission === 'denied' ? 'Blocked by your browser.' : 'Optional, for background focus.'}
                   </p>
                 </div>
               </div>
